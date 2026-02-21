@@ -1,0 +1,38 @@
+# Simple Render.com configuration
+# Deploy services manually instead of Blueprint
+
+# This file is for reference only
+# Deploy services manually in Render dashboard:
+
+# 1. PostgreSQL Database:
+#    - Name: pdf-genius-db
+#    - Plan: Free
+#    - Region: Oregon
+
+# 2. Redis:
+#    - Name: pdf-genius-redis
+#    - Plan: Free
+#    - Region: Oregon
+
+# 3. Backend (Web Service):
+#    - Name: pdf-genius-backend
+#    - Environment: Python
+#    - Plan: Free
+#    - Region: Oregon
+#    - Build: cd backend && pip install -r requirements.txt
+#    - Start: cd backend && uvicorn main_deploy:app --host 0.0.0.0 --port $PORT
+#    - Environment Variables:
+#        GROQ_API_KEY: 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
+#        PDF_CO_API_KEY: surendar.ai.pro@gmail.com_CHUtz4sGlMKf3xhKHjGwkfUzSE06V9Rup5z794lmsnO22AAYCZDnCDLDSHr96bWf
+#        DATABASE_URL: (from PostgreSQL service)
+#        REDIS_URL: (from Redis service)
+#        SECRET_KEY: (auto-generate)
+
+# 4. Frontend (Static Site):
+#    - Name: pdf-genius-frontend
+#    - Environment: Static
+#    - Plan: Free
+#    - Build: cd frontend && npm install && npm run build
+#    - Publish: frontend/.next
+#    - Environment Variable:
+#        NEXT_PUBLIC_API_URL: https://pdf-genius-backend.onrender.com
