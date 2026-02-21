@@ -1,10 +1,9 @@
 [build]
-  command = "cd frontend && CI=false npm install && CI=false npm run build"
-  publish = "frontend/.next"
+  command = "echo 'Building static site...'"
+  publish = "."
 
 [build.environment]
   NODE_VERSION = "18"
-  CI = "false"
 
 [context.production.environment]
-  NEXT_PUBLIC_SITE_URL = "https://pdf-genius.netlify.app"
+  SITE_URL = "https://pdf-genius.netlify.app"
