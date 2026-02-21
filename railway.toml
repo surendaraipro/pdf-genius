@@ -1,0 +1,27 @@
+[build]
+builder = "nixpacks"
+buildCommand = "echo 'Building PDF Genius...'"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "pdf-genius-backend"
+sourcePath = "backend"
+startCommand = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+[[services]]
+name = "pdf-genius-frontend"
+sourcePath = "frontend"
+startCommand = "cd frontend && npm run build && npm run start"
+healthcheckPath = "/"
+healthcheckTimeout = 30
+
+[variables]
+NODE_ENV = "production"
+NEXT_PUBLIC_API_URL = "https://pdf-genius.up.railway.app"
