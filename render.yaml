@@ -35,17 +35,15 @@ services:
       - key: ALLOWED_ORIGINS
         value: https://pdf-genius-frontend.onrender.com,http://localhost:3000
 
-  # Frontend
-  - type: web
+  # Frontend (Static Site - NO region!)
+  - type: static
     name: pdf-genius-frontend
-    env: static
-    region: oregon
     plan: free
     buildCommand: |
       cd frontend
       npm install
       npm run build
-    staticPublishPath: frontend/.next
+    publishPath: frontend/.next
     envVars:
       - key: NEXT_PUBLIC_API_URL
         value: https://pdf-genius-backend.onrender.com
