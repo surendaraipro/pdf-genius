@@ -1,5 +1,5 @@
 [build]
-  command = "cd frontend && npm install && npm run build"
+  command = "cd frontend && CI=false npm install --legacy-peer-deps && npm run build"
   publish = "frontend/.next"
   functions = "netlify/functions"
 
@@ -11,8 +11,3 @@
 [context.production.environment]
   NEXT_PUBLIC_API_URL = "https://pdf-genius.netlify.app/.netlify/functions"
   NEXT_PUBLIC_SITE_URL = "https://pdf-genius.netlify.app"
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
