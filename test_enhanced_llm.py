@@ -16,7 +16,7 @@ async def test_enhanced_llm():
     print("=" * 60)
     
     # Set environment
-    os.environ["GROQ_API_KEY"] = "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"
+    os.environ["GROQ_API_KEY"] = "YOUR_GROQ_API_KEY"
     
     from services.enhanced_llm_router import enhanced_llm_router
     

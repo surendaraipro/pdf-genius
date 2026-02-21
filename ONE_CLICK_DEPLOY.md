@@ -51,8 +51,8 @@ railway add postgresql
 railway add redis
 
 # Set environment variables
-railway variables set GROQ_API_KEY="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"
-railway variables set PDF_CO_API_KEY="surendar.ai.pro@gmail.com_CHUtz4sGlMKf3xhKHjGwkfUzSE06V9Rup5z794lmsnO22AAYCZDnCDLDSHr96bWf"
+railway variables set GROQ_API_KEY="YOUR_GROQ_API_KEY"
+railway variables set PDF_CO_API_KEY="YOUR_PDF_CO_API_KEY"
 railway variables set SECRET_KEY="$(openssl rand -hex 32)"
 
 # Deploy!
@@ -121,8 +121,8 @@ railway login
 railway init
 railway add postgresql
 railway add redis
-railway variables set GROQ_API_KEY="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"
-railway variables set PDF_CO_API_KEY="surendar.ai.pro@gmail.com_CHUtz4sGlMKf3xhKHjGwkfUzSE06V9Rup5z794lmsnO22AAYCZDnCDLDSHr96bWf"
+railway variables set GROQ_API_KEY="YOUR_GROQ_API_KEY"
+railway variables set PDF_CO_API_KEY="YOUR_PDF_CO_API_KEY"
 railway up
 ```
 

@@ -7,7 +7,7 @@ import os
 import sys
 
 # Set environment
-os.environ["GROQ_API_KEY"] = "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"
+os.environ["GROQ_API_KEY"] = "YOUR_GROQ_API_KEY"
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))

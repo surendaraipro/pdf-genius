@@ -16,9 +16,9 @@ services:
       uvicorn main_deploy:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY
-        value: 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
+        value: YOUR_GROQ_API_KEY
       - key: PDF_CO_API_KEY
-        value: surendar.ai.pro@gmail.com_CHUtz4sGlMKf3xhKHjGwkfUzSE06V9Rup5z794lmsnO22AAYCZDnCDLDSHr96bWf
+        value: YOUR_PDF_CO_API_KEY
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL

@@ -48,7 +48,7 @@ async def test_llm_router():
 
 if __name__ == "__main__":
     # Set environment variables for testing
-    os.environ["GROQ_API_KEY"] = "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"
-    os.environ["PDF_CO_API_KEY"] = "surendar.ai.pro@gmail.com_CHUtz4sGlMKf3xhKHjGwkfUzSE06V9Rup5z794lmsnO22AAYCZDnCDLDSHr96bWf"
+    os.environ["GROQ_API_KEY"] = "YOUR_GROQ_API_KEY"
+    os.environ["PDF_CO_API_KEY"] = "YOUR_PDF_CO_API_KEY"
     
     asyncio.run(test_llm_router())
