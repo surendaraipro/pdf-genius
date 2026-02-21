@@ -39,7 +39,7 @@ services:
   - type: web
     name: pdf-genius-frontend
     env: static
-    plan: free
+    plan: starter  # NOT free for static sites!
     buildCommand: |
       cd frontend
       npm install
