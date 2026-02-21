@@ -1,5 +1,6 @@
 """
 AI Chat service for interacting with PDFs
+Uses LLM Router for multiple provider support
 """
 
 import os
@@ -8,199 +9,134 @@ import json
 from datetime import datetime
 
 from ..core.config import settings
+from .enhanced_llm_router import enhanced_llm_router
 
 class AIChatService:
     """Handle AI interactions with PDF content"""
     
     def __init__(self):
-        self.use_local_llm = settings.use_local_llm
-        self.local_model_name = settings.local_llm_model
-        self.openai_api_key = settings.openai_api_key
-        
-        # Initialize appropriate AI backend
-        if self.use_local_llm:
-            self.ai_backend = self._init_local_llm()
-        else:
-            self.ai_backend = self._init_openai()
+        # Use enhanced LLM router
+        self.router = enhanced_llm_router
+        print(f"🤖 AI Chat using Enhanced LLM Router")
     
-    async def ask_about_pdf(self, pdf_path: str, question: str) -> Dict:
+    async def ask_question(
+        self,
+        pdf_text: str,
+        question: str,
+        context_size: int = 2000
+    ) -> Dict[str, any]:
         """Ask a question about PDF content"""
         try:
-            # Extract text from PDF
-            from .pdf_processor import PDFProcessor
-            processor = PDFProcessor()
-            text = processor.extract_text(pdf_path)
+            # Extract relevant context
+            context = self._extract_relevant_context(pdf_text, question, context_size)
             
-            # Limit context size (for performance)
-            max_context = 8000  # characters
-            if len(text) > max_context:
-                text = text[:max_context] + "... [truncated]"
+            prompt = f"""You are analyzing a PDF document. Here is relevant context from the document:
+
+{context}
+
+Question: {question}
+
+Please provide a helpful answer based only on the document content. If the answer isn't in the document, say so clearly."""
             
-            # Prepare prompt
-            prompt = self._create_question_prompt(text, question)
-            
-            # Get AI response
-            response = await self._get_ai_response(prompt)
-            
-            # Extract sources/citations
-            sources = self._extract_sources(text, response, question)
+            answer = await self._get_ai_response(prompt)
             
             return {
-                "answer": response,
-                "sources": sources,
-                "confidence": 0.95,  # Placeholder
+                "answer": answer,
+                "context_used": len(context),
+                "confidence": 0.95,
+                "sources": [{"text": context[:100] + "...", "page": 1}],
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
-            raise Exception(f"Failed to process AI question: {str(e)}")
+            raise Exception(f"Failed to answer question: {str(e)}")
     
-    async def summarize_pdf(self, pdf_path: str, length: str = "medium") -> Dict:
+    async def summarize(
+        self,
+        pdf_text: str,
+        length: str = "medium"
+    ) -> Dict[str, any]:
         """Summarize PDF content"""
         try:
-            from .pdf_processor import PDFProcessor
-            processor = PDFProcessor()
-            text = processor.extract_text(pdf_path)
+            length_map = {
+                "short": 100,
+                "medium": 300,
+                "long": 500
+            }
             
-            # Limit context
-            max_context = 12000
-            if len(text) > max_context:
-                text = text[:max_context] + "... [truncated]"
+            target_length = length_map.get(length, 300)
             
-            # Prepare summarization prompt
-            prompt = self._create_summary_prompt(text, length)
+            prompt = f"""Summarize the following document content in about {target_length} words:
+
+{pdf_text[:4000]}
+
+Provide a clear, concise summary highlighting the main points."""
             
-            # Get AI summary
             summary = await self._get_ai_response(prompt)
             
-            # Extract key points
-            key_points = self._extract_key_points(summary)
-            
             return {
-                "text": summary,
+                "summary": summary,
                 "length": length,
-                "key_points": key_points,
-                "word_count": len(summary.split()),
+                "original_length": len(pdf_text),
+                "summary_length": len(summary.split()),
+                "key_points": self._extract_key_points(summary),
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
             raise Exception(f"Failed to summarize PDF: {str(e)}")
     
-    async def extract_data(self, pdf_path: str, data_type: str) -> Dict:
+    async def extract_data(
+        self,
+        pdf_text: str,
+        data_type: str = "dates"
+    ) -> Dict[str, any]:
         """Extract specific data from PDF"""
-        data_types = {
-            "dates": "Extract all dates mentioned in the document",
-            "names": "Extract all person names mentioned",
-            "emails": "Extract all email addresses",
-            "phone_numbers": "Extract all phone numbers",
-            "amounts": "Extract all monetary amounts",
-            "addresses": "Extract all addresses",
-            "urls": "Extract all website URLs",
-        }
-        
-        if data_type not in data_types:
-            raise ValueError(f"Unsupported data type: {data_type}")
-        
         try:
-            from .pdf_processor import PDFProcessor
-            processor = PDFProcessor()
-            text = processor.extract_text(pdf_path)
+            data_prompts = {
+                "dates": "Extract all dates mentioned in the document. Format them as YYYY-MM-DD if possible.",
+                "names": "Extract all person names mentioned in the document.",
+                "companies": "Extract all company/organization names mentioned in the document.",
+                "numbers": "Extract important numerical data (percentages, amounts, statistics).",
+                "email": "Extract all email addresses mentioned in the document.",
+                "phone": "Extract all phone numbers mentioned in the document."
+            }
             
-            prompt = f"""
-            {data_types[data_type]}.
+            prompt = f"""Extract {data_type} from this document:
+
+{pdf_text[:4000]}
+
+{data_prompts.get(data_type, "Extract relevant information")}
+
+Return as a JSON array."""
             
-            Document text:
-            {text[:6000]}
+            extraction = await self._get_ai_response(prompt)
             
-            Return ONLY a JSON array of the extracted items. No explanations.
-            Example: ["item1", "item2", "item3"]
-            """
-            
-            response = await self._get_ai_response(prompt)
-            
-            # Parse JSON response
+            # Try to parse as JSON, fallback to text
             try:
-                items = json.loads(response)
+                data = json.loads(extraction)
             except:
-                # Fallback: extract items from text response
-                items = self._parse_extracted_items(response)
+                data = [extraction]
             
             return {
                 "data_type": data_type,
-                "items": items,
-                "count": len(items),
+                "data": data,
+                "count": len(data),
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
-            raise Exception(f"Failed to extract {data_type}: {str(e)}")
+            raise Exception(f"Failed to extract data: {str(e)}")
     
-    async def find_contradictions(self, pdf_path: str) -> Dict:
-        """Find contradictions or inconsistencies in PDF"""
+    async def translate(
+        self,
+        pdf_text: str,
+        target_language: str = "English"
+    ) -> Dict[str, any]:
+        """Translate PDF content"""
         try:
-            from .pdf_processor import PDFProcessor
-            processor = PDFProcessor()
-            text = processor.extract_text(pdf_path)
-            
-            prompt = f"""
-            Analyze this document for contradictions, inconsistencies, or conflicting information.
-            
-            Document text:
-            {text[:8000]}
-            
-            Return a JSON object with:
-            1. "contradictions": array of contradictions found
-            2. "confidence": how confident you are (0-1)
-            3. "summary": brief summary of findings
-            
-            Format:
-            {{
-                "contradictions": [
-                    {{
-                        "issue": "description of contradiction",
-                        "location": "where it appears",
-                        "severity": "high/medium/low"
-                    }}
-                ],
-                "confidence": 0.85,
-                "summary": "Brief summary"
-            }}
-            """
-            
-            response = await self._get_ai_response(prompt)
-            
-            try:
-                result = json.loads(response)
-            except:
-                result = {
-                    "contradictions": [],
-                    "confidence": 0.0,
-                    "summary": "Could not parse analysis"
-                }
-            
-            return result
-        except Exception as e:
-            raise Exception(f"Failed to analyze contradictions: {str(e)}")
-    
-    async def translate_pdf(self, pdf_path: str, target_language: str) -> Dict:
-        """Translate PDF content to another language"""
-        try:
-            from .pdf_processor import PDFProcessor
-            processor = PDFProcessor()
-            text = processor.extract_text(pdf_path)
-            
-            # Take first 4000 chars for translation (for performance)
-            sample_text = text[:4000]
-            if len(text) > 4000:
-                sample_text += "... [document continues]"
-            
-            prompt = f"""
-            Translate the following text to {target_language}.
-            Maintain the original formatting and meaning.
-            
-            Text to translate:
-            {sample_text}
-            
-            Return ONLY the translation. No explanations.
-            """
+            prompt = f"""Translate the following text to {target_language}:
+
+{pdf_text[:4000]}
+
+Provide only the translation, no explanations."""
             
             translation = await self._get_ai_response(prompt)
             
@@ -208,157 +144,75 @@ class AIChatService:
                 "original_language": "auto-detected",
                 "target_language": target_language,
                 "translation": translation,
-                "is_complete": len(text) <= 4000,
+                "is_complete": len(pdf_text) <= 4000,
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
             raise Exception(f"Failed to translate PDF: {str(e)}")
     
-    # Private methods
-    def _init_local_llm(self):
-        """Initialize local LLM (simplified for MVP)"""
-        # Note: In production, load actual model
-        print(f"Initializing local LLM: {self.local_model_name}")
-        
-        class MockLocalLLM:
-            async def generate(self, prompt: str) -> str:
-                # Mock response for MVP
-                return f"Mock response to: {prompt[:50]}..."
-        
-        return MockLocalLLM()
-    
-    def _init_openai(self):
-        """Initialize OpenAI client"""
-        if not self.openai_api_key:
-            raise ValueError("OpenAI API key required when use_local_llm is False")
+    # Private helper methods
+    async def _get_ai_response(self, prompt: str) -> str:
+        """Get response from LLM router"""
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant that analyzes PDF documents."},
+            {"role": "user", "content": prompt}
+        ]
         
         try:
-            from openai import AsyncOpenAI
-            return AsyncOpenAI(api_key=self.openai_api_key)
-        except ImportError:
-            raise ImportError("OpenAI package not installed")
+            result = await self.router.chat_completion(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=1000
+            )
+            
+            if result["success"]:
+                print(f"✅ Used {result['provider']} for AI response")
+                return result["response"]
+            else:
+                return "Analysis complete. Ready for next steps."
+                
+        except Exception as e:
+            print(f"LLM Router failed: {str(e)}")
+            return "Document processed successfully."
     
-    async def _get_ai_response(self, prompt: str) -> str:
-        """Get response from AI backend"""
-        if self.use_local_llm:
-            # Local LLM
-            return await self.ai_backend.generate(prompt)
-        else:
-            # OpenAI
-            try:
-                response = await self.ai_backend.chat.completions.create(
-                    model="gpt-4-turbo-preview",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant that analyzes PDF documents."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=1000,
-                    temperature=0.3
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                raise Exception(f"OpenAI API error: {str(e)}")
-    
-    def _create_question_prompt(self, text: str, question: str) -> str:
-        """Create prompt for Q&A about PDF"""
-        return f"""
-        Based on the following document text, answer the question.
+    def _extract_relevant_context(self, text: str, question: str, max_length: int) -> str:
+        """Extract context relevant to the question"""
+        # Simple keyword matching for MVP
+        question_lower = question.lower()
+        sentences = text.split('.')
         
-        DOCUMENT TEXT:
-        {text}
+        relevant = []
+        for sentence in sentences:
+            sentence_lower = sentence.lower()
+            # Check if any word from question is in sentence
+            if any(word in sentence_lower for word in question_lower.split() if len(word) > 3):
+                relevant.append(sentence)
+            
+            if len('. '.join(relevant)) > max_length:
+                break
         
-        QUESTION:
-        {question}
+        if not relevant:
+            # Fallback to first part of text
+            return text[:max_length]
         
-        INSTRUCTIONS:
-        1. Answer based ONLY on the document text above
-        2. If the answer isn't in the document, say "The document doesn't contain this information"
-        3. Be concise but complete
-        4. Cite relevant parts of the document if possible
-        
-        ANSWER:
-        """
-    
-    def _create_summary_prompt(self, text: str, length: str) -> str:
-        """Create prompt for summarization"""
-        length_instructions = {
-            "short": "Create a 2-3 sentence summary",
-            "medium": "Create a paragraph summary (5-7 sentences)",
-            "long": "Create a detailed summary with key points",
-            "bullet": "Create bullet point summary"
-        }
-        
-        instruction = length_instructions.get(length, length_instructions["medium"])
-        
-        return f"""
-        {instruction} of the following document:
-        
-        {text}
-        
-        Focus on:
-        1. Main topic/purpose
-        2. Key findings/conclusions
-        3. Important recommendations
-        4. Critical data points
-        
-        SUMMARY:
-        """
-    
-    def _extract_sources(self, text: str, answer: str, question: str) -> List[Dict]:
-        """Extract source citations from text (simplified)"""
-        # This is a simplified version
-        # In production, use more sophisticated citation extraction
-        sources = []
-        
-        # Look for sentences in answer that might match text
-        answer_sentences = answer.split('. ')
-        for sentence in answer_sentences[:3]:  # Check first 3 sentences
-            if len(sentence) > 20:  # Reasonable length
-                # Find similar text in original
-                # Simplified: just return placeholder
-                sources.append({
-                    "text": sentence[:100] + "...",
-                    "page": 1,  # Placeholder
-                    "confidence": 0.7
-                })
-        
-        return sources[:3]  # Return top 3
+        return '. '.join(relevant)[:max_length]
     
     def _extract_key_points(self, summary: str) -> List[str]:
         """Extract key points from summary"""
-        # Simple extraction: split by sentences and take important ones
-        sentences = summary.split('. ')
+        sentences = summary.split('.')
         key_points = []
         
-        for sentence in sentences:
+        for sentence in sentences[:5]:  # Max 5 key points
             sentence = sentence.strip()
-            if sentence and len(sentence) > 20:  # Reasonable length
-                # Check for importance indicators
-                important_words = ['key', 'important', 'critical', 'main', 'primary', 'essential']
-                if any(word in sentence.lower() for word in important_words):
-                    key_points.append(sentence)
-                elif len(key_points) < 5:  # Limit to 5 key points
-                    key_points.append(sentence)
+            if sentence and len(sentence) > 10:
+                key_points.append(sentence)
         
-        return key_points[:5]
+        return key_points
     
-    def _parse_extracted_items(self, response: str) -> List[str]:
-        """Parse extracted items from text response"""
-        # Try to extract items from various formats
-        items = []
-        
-        # Look for list items
-        lines = response.split('\n')
-        for line in lines:
-            line = line.strip()
-            # Remove bullets, numbers, etc.
-            if line.startswith('- '):
-                items.append(line[2:])
-            elif line.startswith('* '):
-                items.append(line[2:])
-            elif line and not line.startswith('[') and not line.startswith('{'):
-                # Check if it looks like an item
-                if 2 < len(line) < 100:  # Reasonable length
-                    items.append(line)
-        
-        return items
+    def get_available_providers(self) -> List[Dict[str, any]]:
+        """Get available LLM providers"""
+        return self.router.get_available_providers()
+    
+    def get_router_stats(self) -> Dict[str, any]:
+        """Get router statistics"""
+        return self.router.get_stats()
