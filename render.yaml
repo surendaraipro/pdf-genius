@@ -1,0 +1,64 @@
+# Render.com configuration for PDF Genius
+# Free tier - no time limits
+
+services:
+  # Backend API
+  - type: web
+    name: pdf-genius-backend
+    env: python
+    region: oregon  # or singapore for better latency
+    plan: free
+    buildCommand: |
+      cd backend
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend
+      uvicorn main_deploy:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GROQ_API_KEY
+        value: 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
+      - key: PDF_CO_API_KEY
+        value: surendar.ai.pro@gmail.com_CHUtz4sGlMKf3xhKHjGwkfUzSE06V9Rup5z794lmsnO22AAYCZDnCDLDSHr96bWf
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pdf-genius-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: pdf-genius-redis
+          property: connectionString
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: https://pdf-genius.onrender.com,http://localhost:3000
+
+  # Frontend
+  - type: web
+    name: pdf-genius-frontend
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    staticPublishPath: frontend/.next
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://pdf-genius-backend.onrender.com
+
+databases:
+  - name: pdf-genius-db
+    region: oregon
+    plan: free
+    databaseName: pdf_genius
+    user: pdf_genius_user
+
+redis:
+  - name: pdf-genius-redis
+    region: oregon
+    plan: free
+    maxmemoryPolicy: allkeys-lru
