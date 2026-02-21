@@ -16,9 +16,9 @@ services:
       uvicorn main_deploy:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY
-        value: YOUR_GROQ_API_KEY
+        sync: false
       - key: PDF_CO_API_KEY
-        value: YOUR_PDF_CO_API_KEY
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
@@ -33,7 +33,7 @@ services:
       - key: DEBUG
         value: false
       - key: ALLOWED_ORIGINS
-        value: https://pdf-genius.onrender.com,http://localhost:3000
+        value: https://pdf-genius-frontend.onrender.com,http://localhost:3000
 
   # Frontend
   - type: web
@@ -50,15 +50,17 @@ services:
       - key: NEXT_PUBLIC_API_URL
         value: https://pdf-genius-backend.onrender.com
 
+  # Redis Service
+  - type: redis
+    name: pdf-genius-redis
+    region: oregon
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+
 databases:
   - name: pdf-genius-db
     region: oregon
     plan: free
     databaseName: pdf_genius
     user: pdf_genius_user
-
-redis:
-  - name: pdf-genius-redis
-    region: oregon
-    plan: free
-    maxmemoryPolicy: allkeys-lru
